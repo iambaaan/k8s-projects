@@ -1,0 +1,48 @@
+  GNU nano 6.3                                                                                       create.yaml                                                                                        Modified  
+# create configMap
+
+apiVersion: configmap/v1
+kind: Configmap
+metadata:
+  name: time-config
+  namespaces: datacenter 
+data:
+  TIME_FREQ: "2"
+
+---
+
+# create pod
+
+apitVersion: v1
+kind: Pod
+metadata:
+  name: time-check
+  namespace: datacenter
+
+spec: 
+  containers:
+    - name: time-check
+      image: busybox:latest 
+    
+    
+      env:
+        - name: TIME_FREQ
+          valueFrom:
+            configMapkeyRef:
+              name: time-config
+	      key: TIME_FREQ            
+      commad: 
+        - sh  
+        - -c
+        - |
+         while true;
+          do date:
+          $TIME_FREQ;
+         done > /opt/finance/time/time-check.log
+    - volumeMounts:
+        - name: log-volume 
+          path: /opt/finance/time
+   volumes:
+     - name: log-volume
+       emptyDir: {} 
+       

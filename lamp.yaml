@@ -1,0 +1,139 @@
+# 1. ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: php-config
+data:
+  php.ini: |
+    variables_order = "EGPCS"
+
+---
+# 2. Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lamp-wp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lamp
+  template:
+    metadata:
+      labels:
+        app: lamp
+    spec:
+      containers:
+
+        # PHP + Apache
+        - name: httpd-php-container
+          image: webdevops/php-apache:alpine-3-php7
+          ports:
+            - containerPort: 80
+
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-root-pass
+                  key: password
+
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-db-url
+                  key: database
+
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-user-pass
+                  key: username
+
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-user-pass
+                  key: password
+
+            - name: MYSQL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-host
+                  key: host
+
+          volumeMounts:
+            - name: config-volume
+              mountPath: /opt/docker/etc/php/php.ini
+              subPath: php.ini
+
+        # MySQL
+        - name: mysql-container
+          image: mysql:5.6
+          ports:
+            - containerPort: 3306
+
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-root-pass
+                  key: password
+
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-db-url
+                  key: database
+
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-user-pass
+                  key: username
+
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-user-pass
+                  key: password
+
+            - name: MYSQL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-host
+                  key: host
+
+      volumes:
+        - name: config-volume
+          configMap:
+            name: php-config
+
+---
+# 3. NodePort Service for PHP/Apache
+apiVersion: v1
+kind: Service
+metadata:
+  name: lamp-service
+spec:
+  type: NodePort
+  selector:
+    app: lamp
+  ports:
+    - port: 8080
+      targetPort: 80
+      nodePort: 30008
+
+---
+# 4. ClusterIP Service for MySQL
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+spec:
+  type: ClusterIP
+  selector:
+    app: lamp
+  ports:
+    - port: 3306
+      targetPort: 3306
